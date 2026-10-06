@@ -259,11 +259,15 @@ def render(s: LipidStructure) -> str:
     sep = "/" if info.category == "ST" else " "
     if info.n_chains == 0:
         return s.cls  # fixed-structure classes (e.g. eicosanoids): the name is the structure
+    if s.chains is None and s.sum_c is None:
+        return s.cls  # class level only
     if s.chains is None:
         link = s.link if s.link in ("O-", "P-") else ""
         return f"{s.cls}{sep}{link}{s.sum_c}:{s.sum_db}{_ox_suffix(s.sum_ox or 0)}"
     rendered = [(ch, render_chain(ch, s.link or "none", s.stereo, k)) for k, ch in enumerate(s.chains, start=1)]
-    if s.sn_known or info.category == "SP" and all(ch.sn is not None for ch in s.chains):
+    if info.category == "SP":
+        body = "/".join(r for _, r in rendered)  # base first; sphingolipid sn is conventional
+    elif s.sn_known:
         by_pos = {ch.sn: r for ch, r in rendered}
         n_pos = max(info.n_positions, max(by_pos))
         body = "/".join(by_pos.get(p, "0:0") for p in range(1, n_pos + 1))
