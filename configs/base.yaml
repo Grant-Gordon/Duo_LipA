@@ -1,0 +1,56 @@
+# Smoke-test defaults (encoder spec Q13: d = 64, L = 2, 4 heads). Every value here can change between
+# runs without code changes. The encoder block is the screening-stage-1 reference point (spec 5.1).
+seed: 0
+d_model: 64
+
+schema:
+  blocks: [adduct, class, species, chains, dpos, mods, sn, geom, stereo]
+
+data:
+  source: lipidoracle_uvpd
+  root: data/raw/lipidoracle/extracted/04_uvpd
+  top_k: 30                      # smoke-only preprocessing (LipiDetective setting); real spec deferred
+  test_spectrum:
+    title_name_prefix: "PC 15:0_18:1"
+    adduct: "[M+H]+"
+
+conditioning:
+  field_dropout: 0.1
+  extra_fields: {}               # Q40 hook; nothing added in v0
+
+encoder:
+  type: scratch
+  n_layers: 2
+  n_heads: 4
+  ff_mult: 2
+  dropout: 0.0
+  mz_encoding: sinusoidal        # binned | sinusoidal (Q14)
+  rank_position_encoding: false  # LipiDetective rank PE; on only in the binned reference
+  intensity_encoding: discard    # discard | linear | fourier (Q15)
+  mass_relation: {rope: false, pab: false}   # Q16
+  precursor_token: true          # Q9
+  conditioning_tokens: true      # Q18: encoder-side conditioning as extra tokens
+  pooling: precursor             # precursor | attention | mean (Q3)
+  # FM-only settings
+  fm_cache_dir: null             # Q26: off by default
+  layer_mix: true                # Q5
+  head_mlp_layers: 1             # Q5 / Q2: 1 = linear projection, 2 = small MLP
+
+decoder:
+  type: ar                       # heads | ar
+  input: peaks                   # pooled | peaks
+  n_layers: 2
+  n_heads: 4
+  attn_layers: 1                 # H-peaks cross-attention depth
+
+training:
+  grammar_mask_train: true
+  adduct_given: true             # ADDUCT slot fixed from metadata when known
+  optimizer_step: false          # v0 runs forward + backward only
+
+augmentation:                    # Q37: config switch; off by default
+  enabled: false
+  peak_dropout: 0.1
+  intensity_jitter: 0.1
+  noise_peaks: 2
+  mz_jitter_ppm: 5.0

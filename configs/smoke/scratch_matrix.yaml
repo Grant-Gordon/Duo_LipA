@@ -1,0 +1,63 @@
+# Every scratch-encoder arm (encoder spec 5.1 screening configs plus pooling options) crossed with the
+# four decoder variants (decoder spec 10 smoke set), plus schema / training switches.
+# One spectrum, forward + backward, then an eval-mode beam decode. Not a benchmark.
+base: ../base.yaml
+
+encoders:
+  s0_lipidetective:            # stage 0: binned m/z, rank PE, intensity discarded, no mass relation
+    encoder: {mz_encoding: binned, rank_position_encoding: true}
+  s1_absolute:                 # stage 1: sinusoidal m/z only
+    encoder: {}
+  s1_rope:
+    encoder: {mass_relation: {rope: true, pab: false}}
+  s1_pab:
+    encoder: {mass_relation: {rope: false, pab: true}}
+  s1_rope_pab:
+    encoder: {mass_relation: {rope: true, pab: true}}
+  s2_int_linear:               # stage 2 arms (on the stage-1 reference; winner unknown in v0)
+    encoder: {intensity_encoding: linear}
+  s2_int_fourier:
+    encoder: {intensity_encoding: fourier}
+  s3_no_encoder_conditioning:  # stage 3
+    encoder: {conditioning_tokens: false}
+  pool_attention:              # Q3 alternatives
+    encoder: {pooling: attention}
+  pool_mean:
+    encoder: {pooling: mean}
+  no_precursor_token:          # Q9 off (pooling must then not be "precursor")
+    encoder: {precursor_token: false, pooling: attention}
+  s0_binned_rope_pab:          # binned token with both relation mechanisms (not a screening point)
+    encoder: {mz_encoding: binned, rank_position_encoding: true, mass_relation: {rope: true, pab: true}}
+
+decoders:
+  H-pooled: {decoder: {type: heads, input: pooled}}
+  H-peaks: {decoder: {type: heads, input: peaks}}
+  AR-pooled: {decoder: {type: ar, input: pooled}}
+  AR-peaks: {decoder: {type: ar, input: peaks}}
+
+cross:
+  - [all, all]
+
+extra:
+  schema_sn_first|AR-peaks:
+    schema: {blocks: [adduct, class, species, chains, sn, dpos, mods, geom, stereo]}
+  schema_sn_only|AR-peaks:
+    schema: {blocks: [adduct, class, species, chains, sn]}
+  schema_sn_only|H-peaks:
+    schema: {blocks: [adduct, class, species, chains, sn]}
+    decoder: {type: heads, input: peaks}
+  augmentation_on|AR-peaks:
+    augmentation: {enabled: true}
+  grammar_mask_train_off|AR-peaks:
+    training: {grammar_mask_train: false}
+  adduct_not_given|H-peaks:
+    training: {adduct_given: false}
+    decoder: {type: heads, input: peaks}
+  optimizer_step|AR-peaks:
+    training: {optimizer_step: true}
+  h_peaks_attn2|H-peaks:
+    decoder: {type: heads, input: peaks, attn_layers: 2}
+  tiny_d16_L1|AR-peaks:
+    d_model: 16
+    encoder: {n_layers: 1, n_heads: 2, mass_relation: {rope: true, pab: true}}
+    decoder: {n_layers: 1, n_heads: 2}
