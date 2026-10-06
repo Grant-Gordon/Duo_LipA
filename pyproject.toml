@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "duo_lipa"
+version = "0.0.1"
+description = "Lipid annotation (LIPID MAPS hierarchy) from MS2 spectra"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.2",
+    "numpy>=1.26",
+    "pyyaml>=6",
+    "pygoslin>=2.2",
+    "scipy",          # required by pygoslin at import time
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "fm: needs downloaded foundation-model weights (skipped when missing)",
+]
