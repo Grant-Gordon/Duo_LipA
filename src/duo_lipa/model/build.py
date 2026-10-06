@@ -14,6 +14,13 @@ SCRATCH_KEYS = ("n_layers", "n_heads", "ff_mult", "dropout", "mz_encoding", "ran
 
 
 def build_encoder(cfg: dict, d_model: int):
+    enc = _build_encoder(cfg, d_model)
+    if cfg["encoder"].get("fm_cache_dir") and getattr(enc, "frozen", False):
+        enc.cache_dir = cfg["encoder"]["fm_cache_dir"]
+    return enc
+
+
+def _build_encoder(cfg: dict, d_model: int):
     e = cfg["encoder"]
     t = e.get("type", "scratch")
     if t == "scratch":

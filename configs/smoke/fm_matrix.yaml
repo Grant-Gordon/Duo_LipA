@@ -1,0 +1,35 @@
+# Frozen foundation-model encoders on one spectrum, crossed with the decoders they can feed.
+# MS2DeepScore is pooled-only (decoder spec 13), so it runs with pooled decoders only; a separate test
+# checks that a peaks decoder is refused. data.top_k = 100 matches DreaMS inference (k = 100).
+base: ../base.yaml
+
+encoders:
+  dreams_ssl:
+    data: {top_k: 100}
+    encoder: {type: dreams, checkpoint: ssl_model.ckpt, layer_mix: true}
+  dreams_ssl_mlp_head:
+    data: {top_k: 100}
+    encoder: {type: dreams, checkpoint: ssl_model.ckpt, layer_mix: true, head_mlp_layers: 2}
+  dreams_embedding_ckpt_no_mix:
+    data: {top_k: 100}
+    encoder: {type: dreams, checkpoint: embedding_model.ckpt, layer_mix: false}
+  msbert:
+    data: {top_k: 100}
+    encoder: {type: msbert}
+  spec2vec:
+    data: {top_k: 100}
+    encoder: {type: spec2vec}
+  ms2deepscore:
+    data: {top_k: 100}
+    encoder: {type: ms2deepscore}
+
+decoders:
+  H-pooled: {decoder: {type: heads, input: pooled}}
+  H-peaks: {decoder: {type: heads, input: peaks}}
+  AR-pooled: {decoder: {type: ar, input: pooled}}
+  AR-peaks: {decoder: {type: ar, input: peaks}}
+
+cross:
+  - [[dreams_ssl, msbert, spec2vec], all]
+  - [[dreams_ssl_mlp_head, dreams_embedding_ckpt_no_mix], [H-peaks, AR-pooled]]
+  - [[ms2deepscore], [H-pooled, AR-pooled]]
