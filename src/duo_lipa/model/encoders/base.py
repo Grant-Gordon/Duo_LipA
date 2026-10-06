@@ -70,9 +70,35 @@ class FrozenFMAdapter(EncoderAdapter):
             self.backbone.eval()  # frozen FM: no dropout in the backbone
         return self
 
+    cache_dir: str | None = None  # Q26: set from `encoder.fm_cache_dir`; off by default
+
+    def _cache_key(self, peaks: PeakBatch, cond: ConditioningForEncoder) -> str:
+        import hashlib
+
+        h = hashlib.sha1(self.name.encode())
+        for t in (peaks.mz, peaks.intensity, peaks.pad, peaks.precursor_mz):
+            h.update(t.numpy().tobytes())
+        h.update(repr(sorted((k, v) for k, v in cond.raw.items())).encode())
+        return h.hexdigest()
+
+    def _cached_backbone(self, peaks, cond):
+        """Caches frozen backbone outputs per batch content. Incompatible with fresh per-epoch
+        augmentation (encoder spec 5.5): a perturbed spectrum is simply a cache miss."""
+        if not (self.cache_dir and self.frozen):
+            return self.backbone_layers(peaks, cond)
+        from pathlib import Path
+
+        p = Path(self.cache_dir) / f"{self._cache_key(peaks, cond)}.pt"
+        if p.exists():
+            return torch.load(p, weights_only=True)
+        out = self.backbone_layers(peaks, cond)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(out, p)
+        return out
+
     def forward(self, peaks: PeakBatch, cond: ConditioningForEncoder) -> EncoderOutput:
         with torch.set_grad_enabled(torch.is_grad_enabled() and not self.frozen):
-            layers, pad, mz, pooled_native = self.backbone_layers(peaks, cond)
+            layers, pad, mz, pooled_native = self._cached_backbone(peaks, cond)
         if layers is None:
             return EncoderOutput(memory=None, memory_pad=None, pooled=self.proj_pooled(pooled_native))
         h = self.mix(layers) if self.mix is not None else layers[-1]
